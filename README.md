@@ -1,5 +1,11 @@
 # 9Router OpenCode Zen Dual-Gate Standalone Hotfix
 
+> [!NOTE]
+> **REPOSITORY ARCHIVED & RESOLVED UPSTREAM**:  
+> As of **9Router v0.5.104** (released October 2026), upstream 9Router has natively fixed the OpenCode Zen session timestamp calculation.  
+> If you are on **9Router >= 0.5.104**, you **do not need this patch**—simply update 9Router (`npm update -g 9router` or `docker pull decolua/9router:latest`).  
+> This repository is archived for historical reference and for environments running legacy versions (`v0.5.99` and earlier).
+
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![9Router](https://img.shields.io/badge/9Router-Compatible-brightgreen.svg)](https://github.com/9router/9router)
