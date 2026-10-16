@@ -28,7 +28,7 @@ Works across **any environment**: Windows, Linux, macOS, and Docker containers.
 
 ## The Problem
 
-When sending chat completion requests to OpenCode Zen free-tier models (`oc/mimo-v2.6-flash-free`, `oc/space-bunny-free`, `oc/big-pickle`, etc.) through 9Router, the upstream API immediately rejects the request with:
+When sending chat completion requests to OpenCode Zen free-tier models (`oc/cat-jam-free`, `oc/deepseek-v4.1-flash-free`, `oc/beam-free`, `oc/space-bunny-free`, etc.) through 9Router, the upstream API immediately rejects the request with:
 
 ```json
 {
