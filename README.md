@@ -1,11 +1,5 @@
 # 9Router OpenCode Zen Dual-Gate Standalone Hotfix
 
-> [!NOTE]
-> **REPOSITORY ARCHIVED & RESOLVED UPSTREAM**:  
-> As of **9Router v0.5.104** (released October 2026), upstream 9Router has natively fixed the OpenCode Zen session timestamp calculation.  
-> If you are on **9Router >= 0.5.104**, you **do not need this patch**—simply update 9Router (`npm update -g 9router` or `docker pull decolua/9router:latest`).  
-> This repository is archived for historical reference and for environments running legacy versions (`v0.5.99` and earlier).
-
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![9Router](https://img.shields.io/badge/9Router-Compatible-brightgreen.svg)](https://github.com/9router/9router)
@@ -21,7 +15,7 @@ Works across **any environment**: Windows, Linux, macOS, and Docker containers.
 
 | Component | Verified Version | Verification Context & Notes |
 | :--- | :--- | :--- |
-| **9Router** | `v0.5.99` | Tested & verified on bare-metal / npm global (Windows, Linux, macOS) and Docker containers. |
+| **9Router** | `v0.5.99` – `v0.5.104+` | Tested & verified on bare-metal / npm global (Windows, Linux, macOS) and Docker containers. Full support for both legacy and modern `5330.js` / `6249.js` implementations. |
 | **OpenCode CLI** | `v1.19.0` | Target client analyzed (`opencode.exe`) to reverse-engineer the Dual-Gate BigInt formulas (`x-opencode-session` descending timestamp and `x-opencode-request` ascending timestamp) and CLI agent tool contract. |
 
 ---
@@ -139,6 +133,21 @@ python3 patch_9router.py --docker <container_name_or_id>
 
 # Example:
 python3 patch_9router.py --docker 9router
+```
+
+#### Important: Cloud VPS Deployment (Hetzner, OVH, DigitalOcean, etc.)
+On cloud hosting providers, Cloudflare's edge firewall frequently flags datacenter **IPv4** CIDR blocks with `403 FreeTierError`, but allows requests over native **IPv6**.
+Standard Docker bridge networking (`-p 20128:20128`) only routes traffic over IPv4 NAT. To allow 9Router to utilize the host's dual-stack IPv6 egress, launch your container with `--net=host`:
+
+```bash
+docker run -d \
+  --name 9router \
+  --restart unless-stopped \
+  --net=host \
+  -v ~/.9router:/app/data \
+  -e PORT=20128 \
+  -e HOSTNAME=0.0.0.0 \
+  decolua/9router:latest
 ```
 
 The patcher will:

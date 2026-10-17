@@ -7,7 +7,7 @@ Resolves upstream `403 FreeTierError: Free tier only available in official clien
 to OpenCode Zen free-tier models (oc/*) through 9Router.
 
 Verified against:
-  - 9Router: v0.5.99 (npm global & Docker container)
+  - 9Router: v0.5.99 - v0.5.104+ (npm global & Docker container)
   - OpenCode CLI: v1.19.0 (source of truth for Zen Dual-Gate reverse engineering)
 
 Repository: https://github.com/NaxonM/9router-opencode-patch
@@ -63,6 +63,26 @@ TARGET_SESSION_INLINE = (
     'return`ses_${d}${f}`}(i,d)'
 )
 REPLACEMENT_SESSION_INLINE = '("string"==typeof i&&l.test(i.trim())?i.trim():o())'
+
+# 4. v0.5.104+ 5330.js Session ID generator (function A)
+TARGET_SESSION_A_V104 = (
+    'function A(a,b=""){if("string"==typeof a&&r.test(a.trim()))return a.trim();'
+    'let c=e().createHash("sha256").update(`opencode\\0${b||"generic"}\\0${a||""}`).digest(),'
+    'd=z(BigInt(`0x${c.subarray(0,5).toString("hex")}`)&y,1),f="";for(let a=6;a<20;a++)f+=s[c[a]%62];return`ses_${d}${f}`}'
+)
+REPLACEMENT_SESSION_A_V104 = (
+    'function A(a,b=""){if("string"==typeof a&&r.test(a.trim()))return a.trim();'
+    'let t=Date.now(),d=z(t,1),f="";for(let a=0;a<14;a++)f+=s[Math.floor(62*Math.random())];return`ses_${d}${f}`}'
+)
+
+# 5. v0.5.104+ 5330.js Request ID header injection
+TARGET_HEADERS_V104 = '"x-opencode-project":f["x-opencode-project"]||"global",Accept:b?"text/event-stream":"*/*"}'
+REPLACEMENT_HEADERS_V104 = (
+    '"x-opencode-project":f["x-opencode-project"]||"global",'
+    '"x-opencode-request":function(a=Date.now()){let b=4096n*BigInt(a)+1n,c=Array.from({length:6},(a,c)=>Number(b>>BigInt(40-8*c)&255n).toString(16).padStart(2,"0")).join(""),f="";for(let a=0;a<14;a++)f+=s[Math.floor(62*Math.random())];return`msg_${c}${f}`}(),'
+    'Accept:b?"text/event-stream":"*/*"}'
+)
+
 
 # Fallback regex patterns in case variable minification names vary across releases
 REGEX_SESSION_B = re.compile(
@@ -195,9 +215,13 @@ def inspect_chunk(content: str) -> Dict[str, bool]:
         "needs_session_b": False,
         "needs_request_id": False,
         "needs_session_inline": False,
+        "needs_session_a_v104": False,
+        "needs_headers_v104": False,
         "has_session_b_patched": "4096n*BigInt(t)" in content or "Array.from({length:6}" in content,
         "has_request_id_patched": "return A()" in content and r'update(`opencode-req\0' not in content,
-        "has_session_inline_patched": '("string"==typeof i&&l.test(i.trim())?i.trim():o())' in content,
+        "has_session_inline_patched": ('("string"==typeof i&&l.test(i.trim())?i.trim():s())' in content or
+                                      '("string"==typeof i&&l.test(i.trim())?i.trim():o())' in content),
+        "has_headers_v104_patched": '"x-opencode-request":function' in content,
     }
 
     if TARGET_SESSION_B in content or REGEX_SESSION_B.search(content):
@@ -206,6 +230,10 @@ def inspect_chunk(content: str) -> Dict[str, bool]:
         status["needs_request_id"] = True
     if TARGET_SESSION_INLINE in content or REGEX_SESSION_INLINE.search(content):
         status["needs_session_inline"] = True
+    if TARGET_SESSION_A_V104 in content:
+        status["needs_session_a_v104"] = True
+    if TARGET_HEADERS_V104 in content and not status["has_headers_v104_patched"]:
+        status["needs_headers_v104"] = True
 
     return status
 
@@ -245,6 +273,18 @@ def patch_single_file(filepath: str, dry_run: bool = False) -> Tuple[bool, List[
         elif REGEX_SESSION_INLINE.search(modified_content):
             modified_content = REGEX_SESSION_INLINE.sub(REPLACEMENT_SESSION_INLINE, modified_content, count=1)
             actions.append("Replaced inline session generator (via regex fallback) with authentic generator o()")
+
+    # 4. Patch session ID in function A (v0.5.104+)
+    if status["needs_session_a_v104"]:
+        if TARGET_SESSION_A_V104 in modified_content:
+            modified_content = modified_content.replace(TARGET_SESSION_A_V104, REPLACEMENT_SESSION_A_V104)
+            actions.append("Replaced function A with descending BigInt timestamp generator (v0.5.104+)")
+
+    # 5. Patch request ID in buildHeaders (v0.5.104+)
+    if status["needs_headers_v104"]:
+        if TARGET_HEADERS_V104 in modified_content:
+            modified_content = modified_content.replace(TARGET_HEADERS_V104, REPLACEMENT_HEADERS_V104)
+            actions.append("Injected x-opencode-request ascending timestamp generator (v0.5.104+)")
 
     if not actions:
         already = []
@@ -380,7 +420,7 @@ def run_docker_patch(container_name: str, restart: bool = True) -> bool:
     # Find chunks inside container
     find_cmd = [
         docker_bin, "exec", container_name, "sh", "-c",
-        "find /app /9router / -name '5330.js' -o -name '6249.js' 2>/dev/null"
+        "find /app/.next/server/chunks /app/.next-cli-build/server/chunks /app /9router -maxdepth 5 \\( -name '5330.js' -o -name '6249.js' \\) 2>/dev/null | head -n 10"
     ]
     res = subprocess.run(find_cmd, capture_output=True, text=True)
     if res.returncode != 0 or not res.stdout.strip():
